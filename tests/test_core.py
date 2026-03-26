@@ -1,8 +1,8 @@
-"""Tests for core module."""
+"""Tests for checkout example module."""
 
 from __future__ import annotations
 
-from omniskill.core import greeting
+from examples.checkout_example import greeting
 
 
 def test_greeting_default() -> None:

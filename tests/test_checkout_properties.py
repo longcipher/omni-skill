@@ -5,7 +5,7 @@ from __future__ import annotations
 from hypothesis import given
 from hypothesis import strategies as st
 
-from omniskill.core import CartItem, checkout_cart
+from examples.checkout_example import CartItem, checkout_cart
 
 cart_items = st.fixed_dictionaries(
     {

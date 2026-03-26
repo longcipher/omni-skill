@@ -11,14 +11,15 @@ import re
 import uuid
 from pathlib import Path
 
+import structlog
+
 from omniskill.models import Chunk, Document
 
+logger = structlog.get_logger()
 
-class CsvIndexer:
-    """Indexes CSV files row-by-row into Document objects.
 
-    Each row becomes a Document with the CSV headers as metadata keys.
-    """
+class PathTagExtractor:
+    """Mixin that extracts tags from skill-related directory paths."""
 
     def _extract_tags_from_path(self, path: Path) -> tuple[str, ...]:
         """Extract tags from file path components.
@@ -46,6 +47,13 @@ class CsvIndexer:
                 tags.append(parent.name)
                 break
         return tuple(tags)
+
+
+class CsvIndexer(PathTagExtractor):
+    """Indexes CSV files row-by-row into Document objects.
+
+    Each row becomes a Document with the CSV headers as metadata keys.
+    """
 
     def index_file(self, path: str) -> list[Document]:
         """Index a CSV file and return a list of Documents.
@@ -79,7 +87,7 @@ class CsvIndexer:
                     )
                     docs.append(doc)
         except csv.Error:
-            pass
+            logger.exception("Failed to index CSV file", path=str(file_path))
 
         return docs
 
@@ -87,39 +95,12 @@ class CsvIndexer:
 _HEADER_RE = re.compile(r"^(#{2,3})\s+(.+)$", re.MULTILINE)
 
 
-class MarkdownIndexer:
+class MarkdownIndexer(PathTagExtractor):
     """Indexes Markdown files by chunking at H2/H3 headers.
 
     Content before the first header is included as a single chunk if
     non-empty. Each header section becomes its own Chunk.
     """
-
-    def _extract_tags_from_path(self, path: Path) -> tuple[str, ...]:
-        """Extract tags from file path components.
-
-        Only extracts tags from skill-related directories (skills/, datasets/).
-        This avoids extracting tags from temporary or system directories.
-
-        Args:
-            path: Path to the file.
-
-        Returns:
-            A tuple of tags extracted from directory names.
-
-        """
-        tags: list[str] = []
-        # Only extract tags from skill-related directories
-        for parent in path.parents:
-            if parent.name in ("skills", "datasets"):
-                continue
-            # Stop at the first skill-related directory
-            if parent.name == "skills":
-                break
-            # Extract tag from immediate parent if it's a skill directory
-            if parent.parent.name == "skills" and parent.name:
-                tags.append(parent.name)
-                break
-        return tuple(tags)
 
     def index_file(self, path: str) -> list[Chunk]:
         """Index a Markdown file and return a list of Chunks.
@@ -194,6 +175,7 @@ class MarkdownIndexer:
 _INDEXER_MAP: dict[str, type] = {
     ".csv": CsvIndexer,
     ".md": MarkdownIndexer,
+    ".markdown": MarkdownIndexer,
 }
 
 

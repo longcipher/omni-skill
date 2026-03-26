@@ -2,18 +2,11 @@
 
 from __future__ import annotations
 
-from omniskill import core
+from examples.checkout_example import checkout_cart
 
 
 def test_checkout_cart_creates_an_order_and_clears_the_cart() -> None:
     """The checkout helper should create an order total and empty the cart."""
-    checkout_cart = getattr(core, "checkout_cart", None)
-
-    assert callable(checkout_cart)
-
-    if not callable(checkout_cart):
-        return
-
     result = checkout_cart(
         [
             {"name": "Tea", "price_cents": 450, "quantity": 2},
