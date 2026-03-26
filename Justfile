@@ -19,7 +19,6 @@ fix:
 
 # Run all lints
 lint:
-  typos
   rumdl check .
   uv run ruff check .
   uv run ruff format --check .
