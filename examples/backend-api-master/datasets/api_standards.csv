@@ -1,0 +1,11 @@
+pattern,description,example
+snake_case,Use snake_case for all API endpoints and parameters,/api/v1/user_profiles
+kebab-case,Use kebab-case for URL paths,/api/v1/user-profiles
+camelCase,Use camelCase for JSON property names,userName
+plural_nouns,Use plural nouns for resource endpoints,/api/v1/users
+version_prefix,Include API version in URL path,/api/v1/users
+status_codes,Use appropriate HTTP status codes,200 OK, 201 Created, 400 Bad Request
+error_format,Use consistent error response format,{"error": {"code": "INVALID_INPUT", "message": "Invalid input"}}
+pagination,Use cursor-based pagination for large datasets,{"cursor": "abc123", "limit": 20}
+filtering,Support query parameter filtering,?status=active&role=admin
+sorting,Support query parameter sorting,?sort=created_at&order=desc
