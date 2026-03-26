@@ -1,16 +1,16 @@
-# OmniSkill Framework
+# OmniSkill
 
-A universal Agentic-RAG skill framework that enables developers to create domain-specific AI skills with minimal effort.
+A skill generator that turns CSV and Markdown datasets into ready-to-use Agentic-RAG skills with a single command.
 
 ## Overview
 
-OmniSkill is a zero-dependency Agentic-RAG framework that provides:
+OmniSkill analyzes your dataset directory and generates:
 
-- **Hybrid Dataset Support**: Seamlessly handle both CSV (structured) and Markdown (unstructured) data sources
-- **BM25 Search**: Pure local BM25-based retrieval without external dependencies
-- **Tag-based Filtering**: Filter by data type and custom tags
-- **Dynamic Assembly**: Format search results as XML or Markdown for LLM consumption
-- **CLI Scaffolding**: One-command skill generation with proper directory structure
+- **`SKILL.md`** — Skill specification document that tells LLMs how to use the knowledge base
+- **`search.py`** — Standalone Python script for BM25-based retrieval against the dataset
+- **`datasets/`** — Symlinked source data for the generated skill
+
+It also provides a CLI for manually creating skill scaffolding and searching knowledge bases.
 
 ## Installation
 
@@ -36,102 +36,107 @@ uv sync --all-groups
 
 ## Quick Start
 
-### 1. Create a New Skill
+### Generate a Skill from a Dataset
+
+Point OmniSkill at any directory containing CSV and/or Markdown files:
 
 ```bash
-omniskill create backend-api-master
+omniskill generate examples/backend-api-master
 ```
 
-This creates a skill directory with:
+This analyzes the dataset files and produces a complete skill under `skills/<dataset-name>/`:
 
-- `SKILL.md` - Instructions for LLMs
-- `datasets/` - Directory for your knowledge base
-- `__init__.py` - Python module stub
-
-### 2. Add Your Knowledge Base
-
-Place your CSV and Markdown files in the `datasets/` directory:
-
-```bash
-# Add API conventions
-echo "pattern,description,example
-snake_case,Use snake_case for endpoints,/api/v1/user_profiles" > skills/backend-api-master/datasets/api_standards.csv
-
-# Add authentication patterns
-cat > skills/backend-api-master/datasets/auth_patterns.md << EOF
-## JWT Authentication
-
-Use JSON Web Tokens for API authentication.
-
-### Implementation
-
-\`\`\`python
-import jwt
-from datetime import datetime, timedelta
-
-def create_jwt_token(user_id: str, secret_key: str) -> str:
-    payload = {
-        "user_id": user_id,
-        "exp": datetime.utcnow() + timedelta(hours=24)
-    }
-    return jwt.encode(payload, secret_key, algorithm="HS256")
-\`\`\`
-EOF
+```text
+skills/backend-api-master/
+  SKILL.md      # Skill specification for LLMs
+  search.py     # Standalone search script
+  datasets/     # Symlink to source data
 ```
 
-### 3. Search Your Knowledge Base
+### Use the Generated Skill
+
+The generated `search.py` can be run directly:
 
 ```bash
-# Search for API design patterns
-omniskill search "API design patterns" --skill-dir skills/backend-api-master
+python skills/backend-api-master/search.py "API design best practices"
+```
 
-# Search with XML output
-omniskill search "JWT authentication" --skill-dir skills/backend-api-master --format xml
+Or use the CLI:
 
-# Search with Markdown output
-omniskill search "database best practices" --skill-dir skills/backend-api-master --format markdown
+```bash
+omniskill search "API design best practices" --skill-dir skills/backend-api-master
+```
 
-# Search with filtering
-omniskill search "API" --skill-dir skills/backend-api-master --type markdown --tag auth
+### Custom Options
+
+```bash
+# Custom skill name and output directory
+omniskill generate my-datasets/ --name my-skill --output out/my-skill/
+
+# Verbose mode shows dataset analysis details
+omniskill generate my-datasets/ --verbose
 ```
 
 ## Architecture
 
 ```mermaid
 graph TD
-    subgraph "1. AI IDE / Agent Layer"
-        A[User Input: Query] --> B[AI Intercept Request]
-        B --> |Reads| C[Domain SKILL.md]
-        C -. "Invokes" .-> D[Execution Engine]
+    subgraph "1. Dataset Input"
+        CSV[CSV Files] --> GEN[omniskill generate]
+        MD[Markdown Files] --> GEN
     end
 
-    subgraph "2. OmniSkill Core"
-        D --> E{Request Parser}
-        E --> |Extract Keywords, Intent, Domain| F[Universal Search Module BM25/Regex]
+    subgraph "2. Generator"
+        GEN --> ANALYZE[Analyze Dataset]
+        ANALYZE --> GEN_SCRIPT[Generate search.py]
+        ANALYZE --> GEN_MD[Generate SKILL.md]
+        ANALYZE --> LINK[Symlink datasets/]
     end
 
-    subgraph "3. Hybrid Dataset Layer"
-        F --> |Structured Search| G[(CSV Datasets)]
-        G --> |Row Level: API Specs, Status Codes| G1
-        F --> |Document Chunk Search| H[(Markdown Datasets)]
-        H --> |Chunk Level H2/H3: Architecture, Best Practices| H1
+    subgraph "3. Generated Skill"
+        GEN_SCRIPT --> SEARCH_PY[search.py]
+        GEN_MD --> SKILL_MD[SKILL.md]
+        LINK --> DATASETS[datasets/]
     end
 
-    subgraph "4. Dynamic Assembly Layer"
-        G1 --> I[Prompt Assembler]
-        H1 --> I
-        I --> |Formatted Output| J[Assembled System Prompt Context]
+    subgraph "4. Runtime"
+        SEARCH_PY --> ENGINE[SearchEngine]
+        ENGINE --> INDEXER[CSV / MD Indexer]
+        ENGINE --> BM25[BM25 Searcher]
+        BM25 --> ASM[PromptAssembler]
+        ASM --> |XML / Markdown / llms.txt| OUTPUT[Formatted Context]
     end
 
-    J -. "Injects Context" .-> B
-    B --> K[High-Quality, Constrained Code/Solution Output]
+    SKILL_MD -. "instructs LLM" .-> SEARCH_PY
 ```
 
 ## CLI Reference
 
-### Create Command
+### `generate` — Generate a Skill from Datasets
 
-Create a new OmniSkill:
+```bash
+omniskill generate <dataset-dir> [options]
+```
+
+**Arguments:**
+
+- `dataset-dir` — Path to a directory containing CSV and/or Markdown files
+
+**Options:**
+
+- `--name, -n` — Skill name (defaults to the dataset directory name)
+- `--output, -o` — Output directory (defaults to `skills/<skill-name>/`)
+- `--verbose, -v` — Show dataset analysis details
+
+**Example:**
+
+```bash
+omniskill generate data/api-specs/ --name api-assistant --output skills/api-assistant/
+```
+
+### `create` — Create Skill Scaffolding
+
+Create an empty skill directory with template files:
 
 ```bash
 omniskill create <skill-name> [--force]
@@ -139,17 +144,9 @@ omniskill create <skill-name> [--force]
 
 **Options:**
 
-- `--force, -f`: Overwrite existing skill directory
+- `--force, -f` — Overwrite existing skill directory
 
-**Example:**
-
-```bash
-omniskill create my-api-skill
-```
-
-### Search Command
-
-Search skill knowledge base:
+### `search` — Search a Knowledge Base
 
 ```bash
 omniskill search <query> --skill-dir <path> [options]
@@ -157,159 +154,78 @@ omniskill search <query> --skill-dir <path> [options]
 
 **Options:**
 
-- `--skill-dir, -d`: Path to skill directory (required)
-- `--format, -f`: Output format (xml, markdown) [default: xml]
-- `--limit, -l`: Maximum number of results [default: 10]
-- `--type, -t`: Filter by document type (csv, markdown)
-- `--tag`: Filter by tag (can be used multiple times)
-- `--metadata`: Include BM25 scores and metadata
-- `--verbose, -v`: Enable verbose output
+- `--skill-dir, -d` — Path to the skill directory (required)
+- `--format, -f` — Output format: `xml`, `markdown` (default: `xml`)
+- `--limit, -l` — Maximum number of results (default: `10`)
+- `--type, -t` — Filter by document type: `csv`, `markdown`
+- `--tag` — Filter by tag (AND logic, repeatable)
+- `--metadata` — Include BM25 scores in output
+- `--verbose, -v` — Enable verbose output
 
-**Examples:**
+## Python API
 
-```bash
-# Basic search
-omniskill search "API authentication" --skill-dir skills/my-skill
+### Generate a Skill Programmatically
 
-# Search with XML output
-omniskill search "database" --skill-dir skills/my-skill --format xml
+```python
+from omniskill.core.generator import generate_skill
 
-# Search with filtering
-omniskill search "API" --skill-dir skills/my-skill --type markdown --tag auth
+analysis = generate_skill(
+    dataset_dir="data/my-datasets",
+    skill_name="my-skill",
+    output_dir="skills/my-skill",
+)
 
-# Search with limit
-omniskill search "python" --skill-dir skills/my-skill --limit 5
+print(f"Generated {analysis.skill_name} with {analysis.total_documents} documents")
 ```
-
-## Python API Reference
 
 ### SearchEngine
 
-The main entry point for indexing and searching:
+Index and search directories of CSV/Markdown files:
 
 ```python
 from omniskill.core.engine import SearchEngine
-from omniskill.core.assembler import OutputFormat
+from omniskill.core.assembler import OutputFormat, PromptAssembler
 
-# Initialize search engine
 engine = SearchEngine()
+engine.index_directory("skills/my-skill/datasets")
 
-# Index a directory
-documents = engine.index_directory("skills/my-skill")
-
-# Search for content
 results = engine.search("API design", limit=10)
 
-# Search with filtering
-results = engine.search("API", doc_type="markdown", tags=["auth"])
-
-# Assemble results
-from omniskill.core.assembler import PromptAssembler
 assembler = PromptAssembler()
-output = assembler.assemble(results, output_format=OutputFormat.XML)
-print(output)
+print(assembler.assemble(results, output_format=OutputFormat.XML))
 ```
 
-### BM25Searcher
+### Dataset Analysis
 
-Low-level BM25 search implementation:
+Analyze a dataset directory without generating files:
 
 ```python
-from omniskill.core.search import BM25Searcher
-from omniskill.models import Document
+from omniskill.core.generator import analyze_dataset
 
-# Create searcher
-searcher = BM25Searcher(k1=1.5, b=0.75)
-
-# Add documents
-docs = [
-    Document(id="1", source="api.csv", content="Use snake_case", metadata={}, tags=()),
-    Document(id="2", source="auth.md", content="Use JWT tokens", metadata={}, tags=()),
-]
-searcher.add_documents(docs)
-
-# Search
-results = searcher.search("snake_case", limit=10)
+analysis = analyze_dataset("data/my-datasets")
+print(f"CSV files: {len(analysis.csv_files)}")
+print(f"Markdown files: {len(analysis.markdown_files)}")
+print(f"Total documents: ~{analysis.total_documents}")
 ```
 
-### PromptAssembler
+## Output Formats
 
-Format search results for LLM consumption:
+OmniSkill supports three output formats for assembled search results:
 
-```python
-from omniskill.core.assembler import PromptAssembler, OutputFormat
-
-assembler = PromptAssembler(max_context_length=4000)
-
-# XML format
-xml_output = assembler.assemble(results, output_format=OutputFormat.XML)
-
-# Markdown format
-md_output = assembler.assemble(results, output_format=OutputFormat.MARKDOWN)
-```
-
-## Examples
-
-### Backend API Master Skill
-
-A complete example skill for backend API development:
-
-```bash
-# Create the skill
-omniskill create backend-api-master
-
-# Add knowledge base files
-cp examples/backend-api-master/datasets/* skills/backend-api-master/datasets/
-
-# Search for API patterns
-omniskill search "API design patterns" --skill-dir skills/backend-api-master
-
-# Search for authentication
-omniskill search "JWT authentication" --skill-dir skills/backend-api-master
-
-# Search for database best practices
-omniskill search "database connection pooling" --skill-dir skills/backend-api-master
-```
+| Format | CLI Flag | Description |
+|--------|----------|-------------|
+| XML | `--format xml` | Structured `<context_injection>` with `<rules>` and `<reference>` sections |
+| Markdown | `--format markdown` | Human-readable sections with source attribution |
+| llms.txt | (in generated scripts) | Follows the llms.txt spec for LLM consumption |
 
 ## Contributing
 
 ### Development Setup
 
-1. Clone the repository:
-
 ```bash
 git clone https://github.com/longcipher/omni-skill.git
 cd omni-skill
-```
-
-2. Install dependencies:
-
-```bash
 uv sync --all-groups
-```
-
-3. Run tests:
-
-```bash
-just test
-```
-
-4. Run BDD tests:
-
-```bash
-just bdd
-```
-
-5. Run linting:
-
-```bash
-just lint
-```
-
-6. Run type checking:
-
-```bash
-just typecheck
 ```
 
 ### Common Commands
@@ -329,8 +245,7 @@ just typecheck   # Run type checker
 1. Write a failing Gherkin scenario in `features/*.feature`
 2. Write a failing `pytest` test for the inner domain logic
 3. Implement the feature
-4. Re-run `just test` to verify tests pass
-5. Re-run `just bdd` to verify acceptance behavior
+4. Re-run `just test` and `just bdd` to verify
 
 ## License
 
