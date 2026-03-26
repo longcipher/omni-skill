@@ -74,6 +74,11 @@ ignore = [
     "ARG",     # Unused arguments are common in fixtures
     "PLR2004", # Magic value comparisons in tests
     "T20",     # print is fine in tests
+    "TCH",     # Type checking imports used at runtime in tests
+]
+"skills/**/*.py" = [
+    "INP001",  # Generated skill scripts don't need __init__.py
+    "T20",     # print is fine in generated scripts
 ]
 
 [lint.isort]

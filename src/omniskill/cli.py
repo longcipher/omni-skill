@@ -12,6 +12,7 @@ import structlog
 from omniskill import __version__
 from omniskill.core.assembler import PromptAssembler
 from omniskill.core.engine import SearchEngine
+from omniskill.core.generator import generate_skill
 
 logger = structlog.get_logger()
 
@@ -212,6 +213,71 @@ def search(
     except Exception as e:
         logger.exception("search_failed")
         click.echo(f"Error: Search failed: {e}", err=True)
+        sys.exit(1)
+
+
+@cli.command()
+@click.argument("dataset_dir", type=click.Path(exists=True, file_okay=False, path_type=Path))
+@click.option(
+    "--name",
+    "-n",
+    "skill_name",
+    default=None,
+    help="Skill name. Defaults to the dataset directory name.",
+)
+@click.option(
+    "--output",
+    "-o",
+    "output_dir",
+    default=None,
+    type=click.Path(path_type=Path),
+    help="Output directory. Defaults to skills/<skill-name>/.",
+)
+@click.pass_context
+def generate(
+    ctx: click.Context,
+    dataset_dir: Path,
+    skill_name: str | None,
+    output_dir: Path | None,
+) -> None:
+    """Generate a skill from a dataset directory.
+
+    Analyzes CSV and Markdown files in DATASET_DIR and generates:
+    - search.py: Python processing script using OmniSkill
+    - SKILL.md: Skill specification document for LLMs
+    """
+    verbose = ctx.obj.get("verbose", False)
+
+    try:
+        analysis = generate_skill(
+            dataset_dir=dataset_dir,
+            skill_name=skill_name,
+            output_dir=output_dir,
+        )
+
+        out = output_dir or Path("skills") / analysis.skill_name
+        click.echo(f"Generated skill '{analysis.skill_name}' at {out}")
+        click.echo(f"  - {out / 'SKILL.md'}")
+        click.echo(f"  - {out / 'search.py'}")
+        click.echo(f"  - {out / 'datasets'}/")
+
+        if verbose:
+            click.echo("\nDataset analysis:", err=True)
+            click.echo(f"  CSV files: {len(analysis.csv_files)}", err=True)
+            click.echo(f"  Markdown files: {len(analysis.markdown_files)}", err=True)
+            click.echo(f"  Total documents: ~{analysis.total_documents}", err=True)
+
+            for csv_info in analysis.csv_files:
+                click.echo(f"  - {csv_info.path}: {csv_info.row_count} rows, columns={csv_info.columns}", err=True)
+            for md_info in analysis.markdown_files:
+                click.echo(f"  - {md_info.path}: {len(md_info.sections)} sections", err=True)
+
+    except ValueError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        logger.exception("generate_failed")
+        click.echo(f"Error: Generation failed: {e}", err=True)
         sys.exit(1)
 
 

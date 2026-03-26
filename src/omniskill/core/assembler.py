@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 from enum import Enum
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from omniskill.models import Chunk
@@ -21,6 +22,7 @@ class OutputFormat(Enum):
 
     XML = "xml"
     MARKDOWN = "markdown"
+    LLMS_TXT = "llms_txt"
 
 
 class PromptAssembler:
@@ -61,7 +63,7 @@ class PromptAssembler:
             try:
                 output_format = OutputFormat(output_format.lower())
             except ValueError:
-                msg = f"Invalid output format: {output_format}. Use 'xml' or 'markdown'."
+                msg = f"Invalid output format: {output_format}. Use 'xml', 'markdown', or 'llms_txt'."
                 raise ValueError(msg) from None
 
         if not results:
@@ -81,6 +83,8 @@ class PromptAssembler:
         # Format based on output format
         if output_format == OutputFormat.XML:
             return self._format_xml(csv_results, markdown_results, include_metadata)
+        if output_format == OutputFormat.LLMS_TXT:
+            return self._format_llms_txt(csv_results, markdown_results)
         return self._format_markdown(csv_results, markdown_results, include_metadata)
 
     def _format_empty(self, output_format: OutputFormat) -> str:
@@ -231,6 +235,62 @@ class PromptAssembler:
         output = "\n".join(lines)
 
         # Truncate if necessary
+        if len(output) > self.max_context_length:
+            output = output[: self.max_context_length - 20] + "\n\n... [truncated]"
+
+        return output
+
+    def _format_llms_txt(
+        self,
+        csv_results: list[SearchResult],
+        markdown_results: list[SearchResult],
+    ) -> str:
+        """Format results in llms.txt style markdown.
+
+        Follows the llms.txt spec: H1 title, blockquote summary,
+        then H2 sections with content from matched documents.
+
+        Args:
+            csv_results: CSV search results.
+            markdown_results: Markdown search results.
+
+        Returns:
+            llms.txt style markdown string.
+        """
+        lines: list[str] = [
+            "# Search Results",
+            "",
+            "> Relevant context from the knowledge base.",
+            "",
+        ]
+
+        # Group all results by source file
+        by_source: dict[str, list[SearchResult]] = {}
+        for result in csv_results + markdown_results:
+            source = result.document.source
+            if source not in by_source:
+                by_source[source] = []
+            by_source[source].append(result)
+
+        for source, source_results in by_source.items():
+            # Determine section header from source filename
+            filename = Path(source).stem.replace("_", " ").replace("-", " ").title()
+            first = source_results[0].document
+            chunk = first if isinstance(first, Chunk) else None
+
+            if chunk and chunk.header_text:
+                lines.append(f"## {chunk.header_text}")
+            else:
+                lines.append(f"## {filename}")
+            lines.append("")
+
+            for result in source_results:
+                doc = result.document
+                lines.append(doc.content)
+                lines.append("")
+
+        output = "\n".join(lines)
+
         if len(output) > self.max_context_length:
             output = output[: self.max_context_length - 20] + "\n\n... [truncated]"
 
