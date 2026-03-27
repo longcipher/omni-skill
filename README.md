@@ -4,7 +4,7 @@
 [![Context7](https://img.shields.io/badge/Website-context7.com-blue)](https://context7.com/longcipher/omni-skill)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![PyPI](https://img.shields.io/pypi/v/omni-skill.svg)](https://pypi.org/project/omni-skill/)
+[![PyPI](https://img.shields.io/pypi/v/omniskill.svg)](https://pypi.org/project/omniskill/)
 
 ![omni-skill](https://socialify.git.ci/longcipher/omni-skill/image?font=Source+Code+Pro&language=1&name=1&owner=1&pattern=Circuit+Board&theme=Auto)
 
